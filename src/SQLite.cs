@@ -667,9 +667,17 @@ namespace SQLite
 
 				// Build query.
 				var query = "create " + @virtual + "table if not exists \"" + map.TableName + "\" " + @using + "(\n";
-				var decls = map.Columns.Select (p => Orm.SqlDecl (p, StoreDateTimeAsTicks, StoreTimeSpanAsTicks));
+
+				IEnumerable<TableMapping.Column> pks = from c in map.Columns where c.IsPK select c;
+				int numPKs = pks.Count();
+				var decls = map.Columns.Select(p => Orm.SqlDecl(p, StoreDateTimeAsTicks, StoreTimeSpanAsTicks,numPKs == 1));
+				
 				var decl = string.Join (",\n", decls.ToArray ());
 				query += decl;
+				
+				if (numPKs > 1)
+					query += String.Format(",\nprimary key ({0})\n", string.Join(", ", pks.Select(c => "\"" + c.Name + "\"")));
+
 				query += ")";
 				if (map.WithoutRowId) {
 					query += " without rowid";
@@ -2861,11 +2869,11 @@ namespace SQLite
 			return obj.GetType ();
 		}
 
-		public static string SqlDecl (TableMapping.Column p, bool storeDateTimeAsTicks, bool storeTimeSpanAsTicks)
+		public static string SqlDecl (TableMapping.Column p, bool storeDateTimeAsTicks, bool storeTimeSpanAsTicks, bool setPK = true)
 		{
 			string decl = "\"" + p.Name + "\" " + SqlType (p, storeDateTimeAsTicks, storeTimeSpanAsTicks) + " ";
 
-			if (p.IsPK) {
+			if (setPK && p.IsPK) {
 				decl += "primary key ";
 			}
 			if (p.IsAutoInc) {
